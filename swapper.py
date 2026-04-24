@@ -9,7 +9,7 @@ import cv2
 import copy
 import argparse
 import insightface
-import onnxruntime
+import onnxruntime-gpu
 import numpy as np
 from PIL import Image
 from typing import List, Union, Dict, Set, Tuple
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     target_img = Image.open(target_img_path)
 
     # download from https://huggingface.co/deepinsight/inswapper/tree/main
-    model = "./checkpoints/inswapper_128.onnx"
+    model = "../checkpoints/inswapper_128.onnx"
     result_image = process(source_img, target_img, args.source_indexes, args.target_indexes, model)
     
     if args.face_restore:
