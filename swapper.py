@@ -9,7 +9,7 @@ import cv2
 import copy
 import argparse
 import insightface
-import onnxruntime-gpu
+import onnxruntime
 import numpy as np
 from PIL import Image
 from typing import List, Union, Dict, Set, Tuple
