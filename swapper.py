@@ -10,6 +10,7 @@ import copy
 import argparse
 import insightface
 import onnxruntime
+onnxruntime.set_default_logger_severity(3) 
 import numpy as np
 from PIL import Image
 from typing import List, Union, Dict, Set, Tuple
