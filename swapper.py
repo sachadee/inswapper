@@ -196,6 +196,59 @@ def process(source_img: Union[Image.Image, List],
     result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
     return result_image
 
+def process_enhanced(source_img: Union[Image.Image, List], 
+                     target_img: Image.Image, 
+                     source_indexes: str, 
+                     target_indexes: str, 
+                     model: str,
+                     face_restore: bool = True,
+                     background_enhance: bool = True,
+                     face_upsample: bool = True,
+                     upscale: int = 2,
+                     codeformer_fidelity: float = 0.5):
+    
+    # 1. Run the standard face swap
+    result_image = process(source_img, target_img, source_indexes, target_indexes, model)
+    
+    # 2. Run Restoration if requested
+    if face_restore:
+        from restoration import check_ckpts, set_realesrgan, face_restoration, ARCH_REGISTRY
+        import torch
+        
+        check_ckpts()
+        upsampler = set_realesrgan()
+        device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+
+        codeformer_net = ARCH_REGISTRY.get("CodeFormer")(
+            dim_embd=512, codebook_size=1024, n_head=8, n_layers=9, 
+            connect_list=["32", "64", "128", "256"]
+        ).to(device)
+        
+        ckpt_path = "CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth"
+        checkpoint = torch.load(ckpt_path, map_location=device)["params_ema"]
+        codeformer_net.load_state_dict(checkpoint)
+        codeformer_net.eval()
+        
+        # Convert PIL to BGR for restoration
+        result_cv2 = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
+        
+        # Apply restoration
+        enhanced_cv2 = face_restoration(
+            result_cv2, 
+            background_enhance, 
+            face_upsample, 
+            upscale, 
+            codeformer_fidelity,
+            upsampler,
+            codeformer_net,
+            device
+        )
+        
+        # Convert back to PIL
+        result_image = Image.fromarray(enhanced_cv2)
+        
+    return result_image
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Face swap.")
