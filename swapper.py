@@ -62,22 +62,17 @@ def swap_face(face_swapper,
     target_face = target_faces[target_index]
 
     return face_swapper.get(temp_frame, target_face, source_face, paste_back=True)
- 
-    
-def process(source_img: Union[Image.Image, List],
-            target_img: Image.Image,
-            source_indexes: str,
-            target_indexes: str,
-            model: str):
-    # load machine default available providers
-    providers = onnxruntime.get_available_providers()
+  
 
-    # load face_analyser
-    face_analyser = getFaceAnalyser(model, providers)
-    
-    # load face_swapper
-    model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
-    face_swapper = getFaceSwapModel(model_path)
+def process(source_img,
+            target_img,
+            source_indexes,
+            target_indexes,
+            model,
+            face_analyser):
+    # load machine default available providers
+    #providers = onnxruntime.get_available_providers()
+
     
     # read target image
     target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
@@ -93,8 +88,8 @@ def process(source_img: Union[Image.Image, List],
             print("Replacing faces in target image from the left to the right by order")
             for i in range(num_target_faces):
                 source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[i]), cv2.COLOR_RGB2BGR))
-                source_index = i
-                target_index = i
+                source_index = 1
+                target_index = 1
 
                 if source_faces is None:
                     raise Exception("No source faces found!")
@@ -139,7 +134,7 @@ def process(source_img: Union[Image.Image, List],
                         face_swapper,
                         source_faces,
                         target_faces,
-                        source_index,
+                        s,
                         target_index,
                         temp_frame
                     )
