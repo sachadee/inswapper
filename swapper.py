@@ -10,7 +10,6 @@ import copy
 import argparse
 import insightface
 import onnxruntime
-onnxruntime.set_default_logger_severity(3) 
 import numpy as np
 from PIL import Image
 from typing import List, Union, Dict, Set, Tuple
@@ -62,17 +61,22 @@ def swap_face(face_swapper,
     target_face = target_faces[target_index]
 
     return face_swapper.get(temp_frame, target_face, source_face, paste_back=True)
-  
-
-def process(source_img,
-            target_img,
-            source_indexes,
-            target_indexes,
-            model,
-            face_analyser):
+ 
+    
+def process(source_img: Union[Image.Image, List],
+            target_img: Image.Image,
+            source_indexes: str,
+            target_indexes: str,
+            model: str):
     # load machine default available providers
-    #providers = onnxruntime.get_available_providers()
+    providers = onnxruntime.get_available_providers()
 
+    # load face_analyser
+    face_analyser = getFaceAnalyser(model, providers)
+    
+    # load face_swapper
+    model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
+    face_swapper = getFaceSwapModel(model_path)
     
     # read target image
     target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
@@ -88,8 +92,8 @@ def process(source_img,
             print("Replacing faces in target image from the left to the right by order")
             for i in range(num_target_faces):
                 source_faces = get_many_faces(face_analyser, cv2.cvtColor(np.array(source_img[i]), cv2.COLOR_RGB2BGR))
-                source_index = 1
-                target_index = 1
+                source_index = i
+                target_index = i
 
                 if source_faces is None:
                     raise Exception("No source faces found!")
@@ -134,7 +138,7 @@ def process(source_img,
                         face_swapper,
                         source_faces,
                         target_faces,
-                        s,
+                        source_index,
                         target_index,
                         temp_frame
                     )
@@ -191,59 +195,6 @@ def process(source_img,
     result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
     return result_image
 
-def process_enhanced(source_img: Union[Image.Image, List], 
-                     target_img: Image.Image, 
-                     source_indexes: str, 
-                     target_indexes: str, 
-                     model: str,
-                     face_restore: bool = True,
-                     background_enhance: bool = True,
-                     face_upsample: bool = True,
-                     upscale: int = 2,
-                     codeformer_fidelity: float = 0.5):
-    
-    # 1. Run the standard face swap
-    result_image = process(source_img, target_img, source_indexes, target_indexes, model)
-    
-    # 2. Run Restoration if requested
-    if face_restore:
-        from restoration import check_ckpts, set_realesrgan, face_restoration, ARCH_REGISTRY
-        import torch
-        
-        check_ckpts()
-        upsampler = set_realesrgan()
-        device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-
-        codeformer_net = ARCH_REGISTRY.get("CodeFormer")(
-            dim_embd=512, codebook_size=1024, n_head=8, n_layers=9, 
-            connect_list=["32", "64", "128", "256"]
-        ).to(device)
-        
-        ckpt_path = "CodeFormer/CodeFormer/weights/CodeFormer/codeformer.pth"
-        checkpoint = torch.load(ckpt_path, map_location=device)["params_ema"]
-        codeformer_net.load_state_dict(checkpoint)
-        codeformer_net.eval()
-        
-        # Convert PIL to BGR for restoration
-        result_cv2 = cv2.cvtColor(np.array(result_image), cv2.COLOR_RGB2BGR)
-        
-        # Apply restoration
-        enhanced_cv2 = face_restoration(
-            result_cv2, 
-            background_enhance, 
-            face_upsample, 
-            upscale, 
-            codeformer_fidelity,
-            upsampler,
-            codeformer_net,
-            device
-        )
-        
-        # Convert back to PIL
-        result_image = Image.fromarray(enhanced_cv2)
-        
-    return result_image
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Face swap.")
@@ -273,7 +224,7 @@ if __name__ == "__main__":
     target_img = Image.open(target_img_path)
 
     # download from https://huggingface.co/deepinsight/inswapper/tree/main
-    model = "../checkpoints/inswapper_128.onnx"
+    model = "./checkpoints/inswapper_128.onnx"
     result_image = process(source_img, target_img, args.source_indexes, args.target_indexes, model)
     
     if args.face_restore:
